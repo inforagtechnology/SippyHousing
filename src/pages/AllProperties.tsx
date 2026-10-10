@@ -37,8 +37,12 @@ import {
   Phone,
   Hash,
   Plus,
-  AlertTriangle
+  AlertTriangle,
+  Video,
+  User
 } from "lucide-react";
+import { getPropertyConfigurationLabel } from "@/lib/propertyHelpers";
+import { getPropertyPriceStr } from "@/lib/utils";
 
 const AllProperties = () => {
   const navigate = useNavigate();
@@ -283,37 +287,50 @@ const AllProperties = () => {
               </CardHeader>
               
               <CardContent className="space-y-4">
-                {/* Property Details */}
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Building2 className="h-4 w-4 text-gray-500" />
-                    <span>{property.builder || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Building2 className="h-4 w-4 text-gray-500" />
-                    <span>{property.bhk || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Square className="h-4 w-4 text-gray-500" />
-                    <span>{property.flat_size || 'N/A'}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <IndianRupee className="h-4 w-4 text-gray-500" />
-                    <span className="font-semibold">
-                    {(formatPriceWithCommas(property.price_range) || property.price_range)
-                      ? `₹ ${formatPriceWithCommas(property.price_range) || property.price_range}`
-                      : "Price on request"}
-                  </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="h-4 w-4 text-gray-500" />
-                    <span>{formatDate(property.possession_date)}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Phone className="h-4 w-4 text-gray-500" />
-                    <span>{property.contact_number || 'N/A'}</span>
-                  </div>
-                </div>
+                {/* Property Details – shows what was actually entered for this category; empty fields are hidden */}
+                {(() => {
+                  const has = (v: unknown) => v !== undefined && v !== null && String(v).trim() !== '' && String(v).trim().toUpperCase() !== 'N/A';
+                  const first = (...vals: unknown[]) => vals.find(has) as string | number | undefined;
+                  const p = property as Property & Record<string, unknown>;
+                  const isRent = p.property_type === 'Rental' || p.transaction_option === 'Rent' ||
+                                 (!has(p.price) && !has(p.price_range) && !has(p.sale_price) && has(p.rent));
+                  const priceRaw = first(p.price_range, getPropertyPriceStr(p));
+                  const priceText = has(priceRaw) ? (formatPriceWithCommas(String(priceRaw)) || String(priceRaw)) : '';
+                  const size = first(p.flat_size, p.area, p.plot_size, p.built_up_area, p.constructed_area, p.property_size, p.size);
+                  const possession = has(p.possession_date) ? formatDate(String(p.possession_date)) : first(p.possession);
+                  const developer = first(p.builder, p.society_property_name, p.real_property_name);
+                  const config = getPropertyConfigurationLabel(p) || (has(p.commercial_type) ? String(p.commercial_type) : '') ||
+                                 (has(p.no_of_rooms) ? `${p.no_of_rooms} rooms` : '');
+                  const listing = first(p.transaction_option, p.transaction_type_international, p.property_type);
+                  const phone = first(p.contact_number, p.lead_numbers);
+                  const videoCount = Array.isArray(p.video_links) ? p.video_links.length : 0;
+
+                  const rows: { icon: JSX.Element; text: string; bold?: boolean }[] = [];
+                  if (developer) rows.push({ icon: <Building2 className="h-4 w-4 text-gray-500" />, text: String(developer) });
+                  if (config) rows.push({ icon: <Home className="h-4 w-4 text-gray-500" />, text: config });
+                  if (size) rows.push({ icon: <Square className="h-4 w-4 text-gray-500" />, text: String(size) });
+                  rows.push({
+                    icon: <IndianRupee className="h-4 w-4 text-gray-500" />,
+                    text: priceText ? `₹ ${priceText}${isRent ? ' / month' : ''}` : 'Price on request',
+                    bold: true,
+                  });
+                  if (listing) rows.push({ icon: <Key className="h-4 w-4 text-gray-500" />, text: String(listing) });
+                  if (possession) rows.push({ icon: <Calendar className="h-4 w-4 text-gray-500" />, text: String(possession) });
+                  if (has(p.sales_person_name)) rows.push({ icon: <User className="h-4 w-4 text-gray-500" />, text: String(p.sales_person_name) });
+                  if (phone) rows.push({ icon: <Phone className="h-4 w-4 text-gray-500" />, text: String(phone) });
+                  if (videoCount > 0) rows.push({ icon: <Video className="h-4 w-4 text-green-600" />, text: `${videoCount} video${videoCount > 1 ? 's' : ''} added` });
+
+                  return (
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      {rows.map((r, i) => (
+                        <div key={i} className="flex items-center space-x-2 min-w-0">
+                          {r.icon}
+                          <span className={`truncate ${r.bold ? 'font-semibold' : ''}`}>{r.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {/* Additional Info */}
                 {property.additional_info && (
